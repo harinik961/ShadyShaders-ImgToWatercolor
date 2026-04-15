@@ -14,6 +14,7 @@ export class GUI {
     constructor(canvas, animation) {
         this.hoverX = 0;
         this.hoverY = 0;
+        this.dragging = false;
         this.height = canvas.height;
         this.viewPortHeight = this.height - 200;
         this.width = canvas.width;
@@ -86,21 +87,24 @@ export class GUI {
      * @param canvas The canvas being used
      */
     registerEventListeners(canvas) {
-        /* Event listener for key controls */
         window.addEventListener("keydown", (key) => this.onKeydown(key));
-        // need to change to watercolor functions we write later
-        /* Event listener for mouse controls */
-        // canvas.addEventListener("mousedown", (mouse: MouseEvent) =>
-        //   this.dragStart(mouse)
-        // );
-        // canvas.addEventListener("mousemove", (mouse: MouseEvent) =>
-        //   this.drag(mouse)
-        // );
-        // canvas.addEventListener("mouseup", (mouse: MouseEvent) =>
-        //   this.dragEnd(mouse)
-        // );
-        /* Event listener to stop the right click menu */
+        canvas.addEventListener("mousedown", (mouse) => this.dragStart(mouse));
+        canvas.addEventListener("mousemove", (mouse) => this.drag(mouse));
+        canvas.addEventListener("mouseup", (mouse) => this.dragEnd(mouse));
         canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+    } // <-- close here
+    dragStart(mouse) {
+        console.log("drag start", mouse.offsetX, mouse.offsetY);
+        this.dragging = true;
+        this.animation.spawnDrop(mouse.offsetX, mouse.offsetY);
+    }
+    drag(mouse) {
+        if (this.dragging) {
+            this.animation.spawnDrop(mouse.offsetX, mouse.offsetY);
+        }
+    }
+    dragEnd(mouse) {
+        this.dragging = false;
     }
 }
 GUI.rotationSpeed = 0.05;

@@ -7,6 +7,7 @@ import { RenderPass } from "../lib/webglutils/RenderPass.js";
 export class WatercolorAnimation extends CanvasAnimation {
     constructor(canvas) {
         super(canvas);
+        this.drops = [];
         this.canvas2d = document.getElementById("textCanvas");
         this.ctx2 = this.canvas2d.getContext("2d");
         if (this.ctx2) {
@@ -88,11 +89,49 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.cullFace(gl.BACK);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); // null is the default frame buffer
         this.drawScene(0, 0, 800, 800);
+        this.updateDrops();
+        this.drawDrops();
     }
     drawScene(x, y, width, height) {
         const gl = this.ctx;
         gl.viewport(x, y, width, height);
         this.imgRenderPass.draw();
+    }
+    spawnDrop(x, y) {
+        const gl = this.ctx;
+        const pixel = new Uint8Array(4);
+        gl.readPixels(x, 800 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+        this.drops.push({
+            x, y,
+            r: pixel[0], g: pixel[1], b: pixel[2],
+            radius: 2,
+            maxRadius: 20 + Math.random() * 25,
+            opacity: 0.1
+        });
+    }
+    updateDrops() {
+        this.drops.forEach(d => {
+            d.radius += (d.maxRadius - d.radius) * 0.07;
+            d.opacity *= 0.97;
+        });
+        this.drops = this.drops.filter(d => d.opacity > 0.015);
+    }
+    drawDrops() {
+        if (!this.ctx2)
+            return;
+        this.drops.forEach(d => {
+            const grad = this.ctx2.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.radius);
+            grad.addColorStop(0, `rgba(${d.r},${d.g},${d.b},${d.opacity * 0.15})`);
+            grad.addColorStop(0.7, `rgba(${d.r},${d.g},${d.b},${d.opacity * 0.45})`);
+            grad.addColorStop(1.0, `rgba(${d.r},${d.g},${d.b},0)`);
+            this.ctx2.fillStyle = grad;
+            this.ctx2.beginPath();
+            this.ctx2.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+            this.ctx2.fill();
+            this.ctx2.strokeStyle = `rgba(${d.r * 0.5},${d.g * 0.5},${d.b * 0.5},${d.opacity * 0.3})`;
+            this.ctx2.lineWidth = 1.5;
+            this.ctx2.stroke();
+        });
     }
     getGUI() {
         return this.gui;

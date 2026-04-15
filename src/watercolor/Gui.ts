@@ -150,28 +150,31 @@ export class GUI implements IGUI {
    * @param canvas The canvas being used
    */
   private registerEventListeners(canvas: HTMLCanvasElement): void {
-    /* Event listener for key controls */
-    window.addEventListener("keydown", (key: KeyboardEvent) =>
-      this.onKeydown(key)
-    );
+  window.addEventListener("keydown", (key: KeyboardEvent) => this.onKeydown(key));
 
-    // need to change to watercolor functions we write later
-    /* Event listener for mouse controls */
-    // canvas.addEventListener("mousedown", (mouse: MouseEvent) =>
-    //   this.dragStart(mouse)
-    // );
+  canvas.addEventListener("mousedown", (mouse: MouseEvent) => this.dragStart(mouse));
+  canvas.addEventListener("mousemove", (mouse: MouseEvent) => this.drag(mouse));
+  canvas.addEventListener("mouseup", (mouse: MouseEvent) => this.dragEnd(mouse));
+  canvas.addEventListener("contextmenu", (event: any) => event.preventDefault());
+}  // <-- close here
 
-    // canvas.addEventListener("mousemove", (mouse: MouseEvent) =>
-    //   this.drag(mouse)
-    // );
+private dragging: boolean = false;
 
-    // canvas.addEventListener("mouseup", (mouse: MouseEvent) =>
-    //   this.dragEnd(mouse)
-    // );
+private dragStart(mouse: MouseEvent): void {
+  console.log("drag start", mouse.offsetX, mouse.offsetY);
+  this.dragging = true;
+  this.animation.spawnDrop(mouse.offsetX, mouse.offsetY);
+}
 
-    /* Event listener to stop the right click menu */
-    canvas.addEventListener("contextmenu", (event: any) =>
-      event.preventDefault()
-    );
+private drag(mouse: MouseEvent): void {
+  if (this.dragging) {
+    this.animation.spawnDrop(mouse.offsetX, mouse.offsetY);
   }
+}
+
+private dragEnd(mouse: MouseEvent): void {
+  this.dragging = false;
+}
+
+  
 }
