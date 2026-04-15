@@ -6,7 +6,6 @@ export const imgVSText = `
     gl_Position = vec4(vertPosition, 0.0, 1.0);
   }
 `;
-
 export const imgFSText = `
   precision mediump float;
   uniform sampler2D uTexture;
@@ -15,3 +14,4 @@ export const imgFSText = `
     gl_FragColor = texture2D(uTexture, vTexCoord);
   }
 `;
+//# sourceMappingURL=Shaders.js.map
