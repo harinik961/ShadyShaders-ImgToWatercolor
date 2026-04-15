@@ -30,7 +30,6 @@ export class WatercolorAnimation extends CanvasAnimation {
         this.setScene(this.loadedScene);
     }
     initGui() {
-        // image - fix
         let verts = new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]);
         this.imgRenderPass.setIndexBufferData(new Uint32Array([1, 0, 2, 2, 0, 3]));
         this.imgRenderPass.addAttribute("vertPosition", 2, this.ctx.FLOAT, false, 2 * Float32Array.BYTES_PER_ELEMENT, 0, undefined, verts);
@@ -47,7 +46,6 @@ export class WatercolorAnimation extends CanvasAnimation {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         };
-        // img.src = this.scene.src;
         this.imgRenderPass.addUniform("uTexture", (gl, loc) => {
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, this.tex);
@@ -56,7 +54,6 @@ export class WatercolorAnimation extends CanvasAnimation {
         this.imgRenderPass.setup();
     }
     initScene() {
-        // this.initImg();
         const gl = this.ctx;
         gl.bindTexture(gl.TEXTURE_2D, this.tex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.scene);
@@ -66,17 +63,11 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         this.gui.reset();
     }
-    /**
-    * Sets up the mesh and mesh drawing
-    */
-    // public initImg(): void {
-    // }
     /** @internal
     * Draws a single frame
     *
     */
     draw() {
-        // Update skeleton state
         let curr = new Date().getTime();
         let deltaT = curr - this.millis;
         this.millis = curr;
@@ -96,16 +87,11 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.frontFace(gl.CCW);
         gl.cullFace(gl.BACK);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); // null is the default frame buffer
-        this.drawScene(0, 200, 800, 600);
-        /* Draw status bar */
-        // if (this.scene.meshes.length > 0) {
-        //   gl.viewport(0, 0, 800, 200);
-        //   this.sBackRenderPass.draw();
-        // }
+        this.drawScene(0, 0, 800, 800);
     }
     drawScene(x, y, width, height) {
         const gl = this.ctx;
-        gl.viewport(x, y, width, -height);
+        gl.viewport(x, y, width, height);
         this.imgRenderPass.draw();
     }
     getGUI() {
