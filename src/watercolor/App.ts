@@ -62,9 +62,20 @@ export class WatercolorAnimation extends CanvasAnimation {
 
   public initGui(): void {
     let verts = new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]);
+    const texCoords = new Float32Array([
+  0, 0,
+  0, 1,
+  1, 1,
+  1, 0
+]);
     this.imgRenderPass.setIndexBufferData(new Uint32Array([1, 0, 2, 2, 0, 3]))
     this.imgRenderPass.addAttribute("vertPosition", 2, this.ctx.FLOAT, false,
       2 * Float32Array.BYTES_PER_ELEMENT, 0, undefined, verts);
+
+
+
+    this.imgRenderPass.addAttribute("vTexCoord", 2, this.ctx.FLOAT, false,
+  2 * Float32Array.BYTES_PER_ELEMENT, 0, undefined, texCoords);
 
     this.imgRenderPass.setDrawData(this.ctx.TRIANGLES, 6, this.ctx.UNSIGNED_INT, 0);
 
@@ -89,6 +100,34 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.bindTexture(gl.TEXTURE_2D, this.tex);
         gl.uniform1i(loc, 0);
       });
+      // KERNEL (blur)
+const kernel = [
+  0.0625, 0.125, 0.0625,
+        0.125,  0.25,  0.125,
+        0.0625, 0.125, 0.0625
+];
+
+const kernelWeight = kernel.reduce((sum, v) => sum + v, 0) || 1;
+
+// send kernel
+this.imgRenderPass.addUniform("u_kernel",
+  (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+    gl.uniform1fv(loc, kernel);
+  });
+
+// send kernel weight
+this.imgRenderPass.addUniform("u_kernelWeight",
+  (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+    gl.uniform1f(loc, kernelWeight);
+  });
+
+// send texture size
+this.imgRenderPass.addUniform("u_textureSize",
+  (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+    if (this.scene) {
+      gl.uniform2f(loc, this.scene.width, this.scene.height);
+    }
+  });
 
     this.imgRenderPass.setup();
   }
