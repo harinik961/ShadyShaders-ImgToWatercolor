@@ -58,27 +58,6 @@ export class WatercolorAnimation extends CanvasAnimation {
             gl.bindTexture(gl.TEXTURE_2D, this.tex);
             gl.uniform1i(loc, 0);
         });
-        // KERNEL (blur)
-        const kernel = [
-            0.0625, 0.125, 0.0625,
-            0.125, 0.25, 0.125,
-            0.0625, 0.125, 0.0625
-        ];
-        const kernelWeight = kernel.reduce((sum, v) => sum + v, 0) || 1;
-        // send kernel
-        this.imgRenderPass.addUniform("u_kernel", (gl, loc) => {
-            gl.uniform1fv(loc, kernel);
-        });
-        // send kernel weight
-        this.imgRenderPass.addUniform("u_kernelWeight", (gl, loc) => {
-            gl.uniform1f(loc, kernelWeight);
-        });
-        // send texture size
-        this.imgRenderPass.addUniform("u_textureSize", (gl, loc) => {
-            if (this.scene) {
-                gl.uniform2f(loc, this.scene.width, this.scene.height);
-            }
-        });
         this.imgRenderPass.setup();
     }
     initScene() {
