@@ -96,6 +96,18 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.uniform1i(loc, 0);
       });
 
+    this.imgRenderPass.addUniform("u_dropCenter",
+    (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+      gl.uniform2f(loc, 0.5, 0.5); // center of image for now
+    }
+  );
+
+    this.imgRenderPass.addUniform("u_dropRadius",
+      (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+        gl.uniform1f(loc, 1); // covers whole image for now
+      }
+    );
+
 
 
     this.imgRenderPass.setup();
