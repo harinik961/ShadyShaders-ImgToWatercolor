@@ -107,7 +107,20 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.uniform1f(loc, 1); // covers whole image for now
       }
     );
-
+    
+    this.imgRenderPass.addUniform("u_numLayers",
+      (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+        gl.uniform1i(loc, 6);
+      }
+    );
+    // lowered amounts to make it less blocky
+    this.imgRenderPass.addUniform("u_layerBlur", (gl,loc)=>{
+      gl.uniform1fv(loc, new Float32Array([0.02, 0.015, 0.012, 0.010, 0.005, 0.002]));
+    });
+    
+    this.imgRenderPass.addUniform("u_layerOpacity", (gl, loc)=>{
+      gl.uniform1fv(loc, new Float32Array([.4, .5, .6, .7, .8, .9]));
+    });
 
 
     this.imgRenderPass.setup();

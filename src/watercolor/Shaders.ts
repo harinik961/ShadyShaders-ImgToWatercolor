@@ -15,6 +15,9 @@ export const imgFSText = `
   varying vec2 vTexCoord;
   uniform vec2 u_dropCenter;
   uniform float u_dropRadius;
+  uniform int u_numLayers;
+uniform float u_layerBlur[8];
+uniform float u_layerOpacity[8];
 
   float noise(vec2 p) {
 
@@ -55,6 +58,17 @@ export const imgFSText = `
     float blendStrength = 1.0;
     return vec4(mix(color.rgb, tinted, blendStrength * influence), color.a);
   }
+  
+
+  vec4 blurSample(sampler2D tex, vec2 uv, float offset) {
+      vec4 sum = vec4(0.0);
+      sum += texture2D(tex, uv + vec2(-offset, -offset));
+      sum += texture2D(tex, uv + vec2( offset, -offset));
+      sum += texture2D(tex, uv + vec2(-offset,  offset));
+      sum += texture2D(tex, uv + vec2( offset,  offset));
+      sum += texture2D(tex, uv);
+      return sum / 5.0;
+  }
 
    void main() {
     float N = fbm(vTexCoord * 5.0);
@@ -69,6 +83,27 @@ export const imgFSText = `
     vec3 deepened = saturated * 0.4;
 float edgeness = 1.0 - influence; // 0 at center, 1 at edge
 vec3 result = mix(base, deepened, edgeness * 0.8);
-    gl_FragColor = vec4(result, color.a); 
-  }
+
+
+//layer transparency
+vec3 layered = vec3(result);
+    for (int i = 0; i < 8; i++) {
+        if (i >= u_numLayers) break;
+
+        float low  = float(i)     / float(u_numLayers);
+        float high = float(i + 1) / float(u_numLayers);
+
+        vec4 blurred = blurSample(uTexture, distortedCoord, u_layerBlur[i]);
+        float layerLum = (blurred.r + blurred.g + blurred.b) / 3.0;
+
+        float inBand = smoothstep(low - 0.05, low + 0.05, layerLum)
+                     - smoothstep(high - 0.05, high + 0.05, layerLum);
+
+        float alpha = inBand * u_layerOpacity[i];
+        layered = mix(layered, blurred.rgb, alpha);
+    }
+    result =layered;
+
+    gl_FragColor = vec4(result, color.a);
+}
 `;
