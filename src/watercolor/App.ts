@@ -29,6 +29,15 @@ export class WatercolorAnimation extends CanvasAnimation {
   private canvas2d: HTMLCanvasElement;
   private ctx2: CanvasRenderingContext2D | null;
 
+  /* paintbrush state */
+  private maskCanvas: HTMLCanvasElement;
+  private maskCtx: CanvasRenderingContext2D | null;
+  private maskTex: WebGLTexture;
+  private maskDirty: boolean = true;
+  private isPainting: boolean = false;
+  private brushRadius: number = 0.08;
+  private lastDrop: [number, number] | null = null;
+
 
   constructor(canvas: HTMLCanvasElement) {
     super(canvas);
@@ -39,6 +48,27 @@ export class WatercolorAnimation extends CanvasAnimation {
       this.ctx2.font = "25px serif";
       this.ctx2.fillStyle = "rgb(139, 58, 58)";
     }
+
+    this.maskCanvas = document.createElement("canvas");
+    this.maskCanvas.width = 512;
+    this.maskCanvas.height = 512;
+    this.maskCtx = this.maskCanvas.getContext("2d");
+
+    this.canvas2d.addEventListener("mousedown", (e: MouseEvent) => {
+      this.isPainting = true;
+      this.addDrop(e);
+    });
+    this.canvas2d.addEventListener("mousemove", (e: MouseEvent) => {
+      if (this.isPainting) this.addDrop(e);
+    });
+    this.canvas2d.addEventListener("mouseup", () => {
+      this.isPainting = false;
+      this.lastDrop = null;
+    });
+    this.canvas2d.addEventListener("mouseleave", () => {
+      this.isPainting = false;
+      this.lastDrop = null;
+    });
 
     this.ctx = Debugger.makeDebugContext(this.ctx);
     let gl = this.ctx;
@@ -52,11 +82,59 @@ export class WatercolorAnimation extends CanvasAnimation {
     this.millis = new Date().getTime();
   }
 
+  private paintAt(xNorm: number, yNorm: number): void {
+    if (!this.maskCtx) return;
+    const w = this.maskCanvas.width;
+    const h = this.maskCanvas.height;
+    const x = xNorm * w;
+    const y = yNorm * h;
+    const r = this.brushRadius * Math.max(w, h);
+    const grad = this.maskCtx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, "rgba(255,255,255,0.5)");
+    grad.addColorStop(0.7, "rgba(255,255,255,0.2)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    this.maskCtx.fillStyle = grad;
+    this.maskCtx.beginPath();
+    this.maskCtx.arc(x, y, r, 0, Math.PI * 2);
+    this.maskCtx.fill();
+    this.maskDirty = true;
+  }
+
+  private addDrop(e: MouseEvent): void {
+    const rect = this.canvas2d.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+
+    if (this.lastDrop) {
+      const dx = x - this.lastDrop[0];
+      const dy = y - this.lastDrop[1];
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const step = this.brushRadius * 0.25;
+      const numSteps = Math.max(1, Math.ceil(dist / step));
+      for (let i = 1; i <= numSteps; i++) {
+        const t = i / numSteps;
+        this.paintAt(this.lastDrop[0] + dx * t, this.lastDrop[1] + dy * t);
+      }
+    } else {
+      this.paintAt(x, y);
+    }
+    this.lastDrop = [x, y];
+  }
+
+  private clearMask(): void {
+    if (!this.maskCtx) return;
+    this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+    this.maskDirty = true;
+  }
+
   /**
   * Setup the animation. This can be called again to reset the animation.
   */
   public reset(): void {
     this.gui.reset();
+    this.clearMask();
+    this.lastDrop = null;
+    this.isPainting = false;
     this.setScene(this.loadedScene);
   }
 
@@ -79,6 +157,14 @@ export class WatercolorAnimation extends CanvasAnimation {
     this.tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
 
+    this.maskTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.maskTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.maskCanvas);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
 
     const img = new Image();
     img.onload = () => {
@@ -94,6 +180,17 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.tex);
         gl.uniform1i(loc, 0);
+      });
+
+    this.imgRenderPass.addUniform("u_maskTex",
+      (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.maskTex);
+        if (this.maskDirty) {
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.maskCanvas);
+          this.maskDirty = false;
+        }
+        gl.uniform1i(loc, 1);
       });
 
     this.imgRenderPass.addUniform("u_dropCenter",
@@ -186,6 +283,9 @@ export class WatercolorAnimation extends CanvasAnimation {
   */
   public setScene(fileLocation: string): void {
     this.loadedScene = fileLocation;
+    this.clearMask();
+    this.lastDrop = null;
+    this.isPainting = false;
     this.scene = new Image();
     this.scene.onload = () => this.initScene();
     this.scene.src = fileLocation;

@@ -88,17 +88,17 @@ export class GUI {
     registerEventListeners(canvas) {
         /* Event listener for key controls */
         window.addEventListener("keydown", (key) => this.onKeydown(key));
-        // need to change to watercolor functions we write later
-        /* Event listener for mouse controls */
-        // canvas.addEventListener("mousedown", (mouse: MouseEvent) =>
-        //   this.dragStart(mouse)
-        // );
-        // canvas.addEventListener("mousemove", (mouse: MouseEvent) =>
-        //   this.drag(mouse)
-        // );
-        // canvas.addEventListener("mouseup", (mouse: MouseEvent) =>
-        //   this.dragEnd(mouse)
-        // );
+        // // need to change to watercolor functions we write later
+        // /* Event listener for mouse controls */
+        // // canvas.addEventListener("mousedown", (mouse: MouseEvent) =>
+        // //   this.dragStart(mouse)
+        // // );
+        // // canvas.addEventListener("mousemove", (mouse: MouseEvent) =>
+        // //   this.drag(mouse)
+        // // );
+        // // canvas.addEventListener("mouseup", (mouse: MouseEvent) =>
+        // //   this.dragEnd(mouse)
+        // // );
         /* Event listener to stop the right click menu */
         canvas.addEventListener("contextmenu", (event) => event.preventDefault());
     }

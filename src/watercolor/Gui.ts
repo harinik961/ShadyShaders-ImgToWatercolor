@@ -155,19 +155,19 @@ export class GUI implements IGUI {
       this.onKeydown(key)
     );
 
-    // need to change to watercolor functions we write later
-    /* Event listener for mouse controls */
-    // canvas.addEventListener("mousedown", (mouse: MouseEvent) =>
-    //   this.dragStart(mouse)
-    // );
+    // // need to change to watercolor functions we write later
+    // /* Event listener for mouse controls */
+    // // canvas.addEventListener("mousedown", (mouse: MouseEvent) =>
+    // //   this.dragStart(mouse)
+    // // );
 
-    // canvas.addEventListener("mousemove", (mouse: MouseEvent) =>
-    //   this.drag(mouse)
-    // );
+    // // canvas.addEventListener("mousemove", (mouse: MouseEvent) =>
+    // //   this.drag(mouse)
+    // // );
 
-    // canvas.addEventListener("mouseup", (mouse: MouseEvent) =>
-    //   this.dragEnd(mouse)
-    // );
+    // // canvas.addEventListener("mouseup", (mouse: MouseEvent) =>
+    // //   this.dragEnd(mouse)
+    // // );
 
     /* Event listener to stop the right click menu */
     canvas.addEventListener("contextmenu", (event: any) =>
