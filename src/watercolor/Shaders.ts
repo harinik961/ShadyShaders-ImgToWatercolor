@@ -42,15 +42,16 @@ export const imgFSText = `
   }
 
   // blur
-  vec4 blurSample(sampler2D tex, vec2 uv, float offset) {
-      vec4 sum = vec4(0.0);
-      sum += texture2D(tex, uv + vec2(-offset, -offset));
-      sum += texture2D(tex, uv + vec2( offset, -offset));
-      sum += texture2D(tex, uv + vec2(-offset,  offset));
-      sum += texture2D(tex, uv + vec2( offset,  offset));
-      sum += texture2D(tex, uv);
-      return sum / 5.0;
-  }
+  vec4 blurSample(sampler2D tex, vec2 uv, float offset, float combined) {
+    float r = offset * (1.0 + combined * 2.5);
+    vec4 sum = vec4(0.0);
+    sum += texture2D(tex, uv + vec2(-r, -r));
+    sum += texture2D(tex, uv + vec2( r, -r));
+    sum += texture2D(tex, uv + vec2(-r,  r));
+    sum += texture2D(tex, uv + vec2( r,  r));
+    sum += texture2D(tex, uv);
+    return sum / 5.0;
+}
 
   // main
   void main() {
@@ -64,8 +65,8 @@ export const imgFSText = `
     float fade = 1.0 - smoothstep(0.0, 1.0, t);
     float edge = smoothstep(spreadRadius - 0.05, spreadRadius, dist);
     float spreadInfluence = spread * fade * (0.7 + 0.3 * edge);
-    float combined = max(maskInfluence, spreadInfluence);
-
+    float accumulatedMask = maskInfluence * maskInfluence;
+    float combined = max(accumulatedMask, spreadInfluence);
     if (combined <= 0.0) {
         gl_FragColor = origColor;
         return;
@@ -85,8 +86,10 @@ export const imgFSText = `
     float lum = dot(base, vec3(0.299, 0.587, 0.114));
     vec3 saturated = mix(vec3(lum), base, 2.0);
 
-    float edgeness = 1.0 - smoothstep(0.3, 1.0, combined);
-    vec3 deepened = saturated * mix(1.0, 0.35, edgeness);
+    float ringInner = 0.2 + accumulatedMask * 0.3;
+    float edgeness  = 1.0 - smoothstep(ringInner, 1.0, combined);
+    float ringStrength = mix(0.35, 0.15, accumulatedMask);
+    vec3 deepened = saturated * mix(1.0, ringStrength, edgeness);
 
     vec3 result = deepened;
 
@@ -95,7 +98,7 @@ export const imgFSText = `
         if (i >= u_numLayers) break;
         float low  = float(i)     / float(u_numLayers);
         float high = float(i + 1) / float(u_numLayers);
-        vec4 blurred = blurSample(uTexture, distortedCoord, u_layerBlur[i]);
+        vec4 blurred = blurSample(uTexture, distortedCoord, u_layerBlur[i], combined);
         float layerLum = (blurred.r + blurred.g + blurred.b) / 3.0;
         float inBand = smoothstep(low - 0.05, low + 0.05, layerLum)
                      - smoothstep(high - 0.05, high + 0.05, layerLum);

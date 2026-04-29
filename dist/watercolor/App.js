@@ -57,9 +57,8 @@ export class WatercolorAnimation extends CanvasAnimation {
         const x = xNorm * w;
         const y = yNorm * h;
         const r = this.brushRadius * Math.max(w, h);
-        // Strong center, soft edge
         const grad = this.maskCtx.createRadialGradient(x, y, 0, x, y, r);
-        grad.addColorStop(0, "rgba(255,255,255,1.0)"); // fully opaque center
+        grad.addColorStop(0, "rgba(255,255,255,1.0)");
         grad.addColorStop(0.4, "rgba(255,255,255,0.9)");
         grad.addColorStop(0.7, "rgba(255,255,255,0.5)");
         grad.addColorStop(1.0, "rgba(255,255,255,0)");
@@ -156,7 +155,6 @@ export class WatercolorAnimation extends CanvasAnimation {
         this.imgRenderPass.addUniform("u_numLayers", (gl, loc) => {
             gl.uniform1i(loc, 6);
         });
-        // lowered amounts to make it less blocky
         this.imgRenderPass.addUniform("u_layerBlur", (gl, loc) => {
             gl.uniform1fv(loc, new Float32Array([0.02, 0.015, 0.012, 0.010, 0.005, 0.002]));
         });
@@ -210,8 +208,8 @@ export class WatercolorAnimation extends CanvasAnimation {
                 this.drops.splice(i, 1);
                 continue;
             }
-            const tNorm = Math.min(t / 1.5, 1.0); // normalize time
-            const eased = 1.0 - Math.exp(-3.0 * tNorm); // fast → slow
+            const tNorm = Math.min(t / 1.5, 1.0);
+            const eased = 1.0 - Math.exp(-3.0 * tNorm);
             const maxScale = 2;
             const radius = this.brushRadius * (1.0 + eased * (maxScale - 1.0));
             const alpha = 1.0 - t * 0.5;
@@ -261,8 +259,6 @@ export class WatercolorAnimation extends CanvasAnimation {
         this.scene.src = fileLocation;
     }
 }
-// idt this is being used anywhere
-// this was being called in index.js in dist/watercolor but i changed it so im just gonna comment this out
 export function initializeCanvas() {
     const canvas = document.getElementById("glCanvas");
     /* Start drawing */
