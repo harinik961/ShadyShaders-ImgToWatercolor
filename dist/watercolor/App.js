@@ -9,8 +9,11 @@ export class WatercolorAnimation extends CanvasAnimation {
         super(canvas);
         this.maskDirty = true;
         this.isPainting = false;
-        this.brushRadius = 0.08;
+        this.brushRadius = 0.07;
         this.lastDrop = null;
+        this.startTime = 0;
+        this.dropCenter = [0.5, 0.5];
+        this.drops = [];
         this.canvas2d = document.getElementById("textCanvas");
         this.ctx2 = this.canvas2d.getContext("2d");
         if (this.ctx2) {
@@ -54,10 +57,12 @@ export class WatercolorAnimation extends CanvasAnimation {
         const x = xNorm * w;
         const y = yNorm * h;
         const r = this.brushRadius * Math.max(w, h);
+        // Strong center, soft edge
         const grad = this.maskCtx.createRadialGradient(x, y, 0, x, y, r);
-        grad.addColorStop(0, "rgba(255,255,255,0.5)");
-        grad.addColorStop(0.7, "rgba(255,255,255,0.2)");
-        grad.addColorStop(1, "rgba(255,255,255,0)");
+        grad.addColorStop(0, "rgba(255,255,255,1.0)"); // fully opaque center
+        grad.addColorStop(0.4, "rgba(255,255,255,0.9)");
+        grad.addColorStop(0.7, "rgba(255,255,255,0.5)");
+        grad.addColorStop(1.0, "rgba(255,255,255,0)");
         this.maskCtx.fillStyle = grad;
         this.maskCtx.beginPath();
         this.maskCtx.arc(x, y, r, 0, Math.PI * 2);
@@ -68,6 +73,8 @@ export class WatercolorAnimation extends CanvasAnimation {
         const rect = this.canvas2d.getBoundingClientRect();
         const x = (e.clientX - rect.left) / rect.width;
         const y = (e.clientY - rect.top) / rect.height;
+        this.dropCenter = [x, y];
+        this.startTime = performance.now();
         if (this.lastDrop) {
             const dx = x - this.lastDrop[0];
             const dy = y - this.lastDrop[1];
@@ -83,6 +90,7 @@ export class WatercolorAnimation extends CanvasAnimation {
             this.paintAt(x, y);
         }
         this.lastDrop = [x, y];
+        this.drops.push({ x, y, start: performance.now() });
     }
     clearMask() {
         if (!this.maskCtx)
@@ -145,12 +153,6 @@ export class WatercolorAnimation extends CanvasAnimation {
             }
             gl.uniform1i(loc, 1);
         });
-        this.imgRenderPass.addUniform("u_dropCenter", (gl, loc) => {
-            gl.uniform2f(loc, 0.5, 0.5); // center of image for now
-        });
-        this.imgRenderPass.addUniform("u_dropRadius", (gl, loc) => {
-            gl.uniform1f(loc, 1); // covers whole image for now
-        });
         this.imgRenderPass.addUniform("u_numLayers", (gl, loc) => {
             gl.uniform1i(loc, 6);
         });
@@ -160,6 +162,13 @@ export class WatercolorAnimation extends CanvasAnimation {
         });
         this.imgRenderPass.addUniform("u_layerOpacity", (gl, loc) => {
             gl.uniform1fv(loc, new Float32Array([.4, .5, .6, .7, .8, .9]));
+        });
+        this.imgRenderPass.addUniform("u_time", (gl, loc) => {
+            const elapsed = (performance.now() - this.startTime) / 1000.0;
+            gl.uniform1f(loc, elapsed);
+        });
+        this.imgRenderPass.addUniform("u_dropCenter", (gl, loc) => {
+            gl.uniform2f(loc, this.dropCenter[0], this.dropCenter[1]);
         });
         this.imgRenderPass.setup();
     }
@@ -173,6 +182,43 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         this.gui.reset();
     }
+    paintSoft(xNorm, yNorm, radius, alpha) {
+        if (!this.maskCtx)
+            return;
+        const w = this.maskCanvas.width;
+        const h = this.maskCanvas.height;
+        const x = xNorm * w;
+        const y = yNorm * h;
+        const r = radius * Math.max(w, h);
+        const grad = this.maskCtx.createRadialGradient(x, y, 0, x, y, r);
+        grad.addColorStop(0, `rgba(255,255,255,${alpha})`);
+        grad.addColorStop(0.5, `rgba(255,255,255,${alpha * 0.6})`);
+        grad.addColorStop(1.0, `rgba(255,255,255,0)`);
+        this.maskCtx.fillStyle = grad;
+        this.maskCtx.beginPath();
+        this.maskCtx.arc(x, y, r, 0, Math.PI * 2);
+        this.maskCtx.fill();
+    }
+    updateDrops() {
+        if (!this.maskCtx)
+            return;
+        const now = performance.now();
+        for (let i = this.drops.length - 1; i >= 0; i--) {
+            const d = this.drops[i];
+            const t = (now - d.start) / 1000;
+            if (t > 2.0) {
+                this.drops.splice(i, 1);
+                continue;
+            }
+            const tNorm = Math.min(t / 1.5, 1.0); // normalize time
+            const eased = 1.0 - Math.exp(-3.0 * tNorm); // fast → slow
+            const maxScale = 2;
+            const radius = this.brushRadius * (1.0 + eased * (maxScale - 1.0));
+            const alpha = 1.0 - t * 0.5;
+            this.paintSoft(d.x, d.y, radius, alpha);
+        }
+        this.maskDirty = true;
+    }
     /** @internal
     * Draws a single frame
     *
@@ -182,13 +228,7 @@ export class WatercolorAnimation extends CanvasAnimation {
         let deltaT = curr - this.millis;
         this.millis = curr;
         deltaT /= 1000;
-        // idk what this does and was giving error so i took it out
-        // if (this.ctx2) {
-        //   this.ctx2.clearRect(0, 0, this.ctx2.canvas.width, this.ctx2.canvas.height);
-        //   if (this.scene.meshes.length > 0) {
-        //     this.ctx2.fillText(this.getGUI().getModeString(), 50, 710);
-        //   }
-        // }
+        this.updateDrops();
         // Drawing
         const gl = this.ctx;
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

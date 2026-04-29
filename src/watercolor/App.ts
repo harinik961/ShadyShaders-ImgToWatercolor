@@ -35,8 +35,12 @@ export class WatercolorAnimation extends CanvasAnimation {
   private maskTex: WebGLTexture;
   private maskDirty: boolean = true;
   private isPainting: boolean = false;
-  private brushRadius: number = 0.08;
+  private brushRadius: number = 0.07;
   private lastDrop: [number, number] | null = null;
+
+  private startTime: number = 0;      
+  private dropCenter: [number, number] = [0.5, 0.5]; 
+  private drops: { x: number; y: number; start: number }[] = [];
 
 
   constructor(canvas: HTMLCanvasElement) {
@@ -81,45 +85,55 @@ export class WatercolorAnimation extends CanvasAnimation {
     this.initGui();
     this.millis = new Date().getTime();
   }
+  
+private paintAt(xNorm: number, yNorm: number): void {
+  if (!this.maskCtx) return;
+  const w = this.maskCanvas.width;
+  const h = this.maskCanvas.height;
+  const x = xNorm * w;
+  const y = yNorm * h;
+  const r = this.brushRadius * Math.max(w, h);
 
-  private paintAt(xNorm: number, yNorm: number): void {
-    if (!this.maskCtx) return;
-    const w = this.maskCanvas.width;
-    const h = this.maskCanvas.height;
-    const x = xNorm * w;
-    const y = yNorm * h;
-    const r = this.brushRadius * Math.max(w, h);
-    const grad = this.maskCtx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, "rgba(255,255,255,0.5)");
-    grad.addColorStop(0.7, "rgba(255,255,255,0.2)");
-    grad.addColorStop(1, "rgba(255,255,255,0)");
-    this.maskCtx.fillStyle = grad;
-    this.maskCtx.beginPath();
-    this.maskCtx.arc(x, y, r, 0, Math.PI * 2);
-    this.maskCtx.fill();
-    this.maskDirty = true;
-  }
+  const grad = this.maskCtx.createRadialGradient(x, y, 0, x, y, r);
+  grad.addColorStop(0,   "rgba(255,255,255,1.0)");  
+  grad.addColorStop(0.4, "rgba(255,255,255,0.9)");
+  grad.addColorStop(0.7, "rgba(255,255,255,0.5)");
+  grad.addColorStop(1.0, "rgba(255,255,255,0)");
+  this.maskCtx.fillStyle = grad;
+  this.maskCtx.beginPath();
+  this.maskCtx.arc(x, y, r, 0, Math.PI * 2);
+  this.maskCtx.fill();
+
+  this.maskDirty = true;
+}
 
   private addDrop(e: MouseEvent): void {
-    const rect = this.canvas2d.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
+  const rect = this.canvas2d.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
 
-    if (this.lastDrop) {
-      const dx = x - this.lastDrop[0];
-      const dy = y - this.lastDrop[1];
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const step = this.brushRadius * 0.25;
-      const numSteps = Math.max(1, Math.ceil(dist / step));
-      for (let i = 1; i <= numSteps; i++) {
-        const t = i / numSteps;
-        this.paintAt(this.lastDrop[0] + dx * t, this.lastDrop[1] + dy * t);
-      }
-    } else {
-      this.paintAt(x, y);
+  this.dropCenter = [x, y];  
+  this.startTime = performance.now();
+
+  if (this.lastDrop) {
+    const dx = x - this.lastDrop[0];
+    const dy = y - this.lastDrop[1];
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const step = this.brushRadius * 0.25;
+    const numSteps = Math.max(1, Math.ceil(dist / step));
+
+    for (let i = 1; i <= numSteps; i++) {
+      const t = i / numSteps;
+      this.paintAt(this.lastDrop[0] + dx * t, this.lastDrop[1] + dy * t);
     }
-    this.lastDrop = [x, y];
+  } else {
+    this.paintAt(x, y);
   }
+
+  this.lastDrop = [x, y];
+  this.drops.push({x, y,start: performance.now()});
+
+}
 
   private clearMask(): void {
     if (!this.maskCtx) return;
@@ -193,24 +207,11 @@ export class WatercolorAnimation extends CanvasAnimation {
         gl.uniform1i(loc, 1);
       });
 
-    this.imgRenderPass.addUniform("u_dropCenter",
-    (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
-      gl.uniform2f(loc, 0.5, 0.5); // center of image for now
-    }
-  );
-
-    this.imgRenderPass.addUniform("u_dropRadius",
-      (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
-        gl.uniform1f(loc, 1); // covers whole image for now
-      }
-    );
-    
     this.imgRenderPass.addUniform("u_numLayers",
       (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
         gl.uniform1i(loc, 6);
       }
     );
-    // lowered amounts to make it less blocky
     this.imgRenderPass.addUniform("u_layerBlur", (gl,loc)=>{
       gl.uniform1fv(loc, new Float32Array([0.02, 0.015, 0.012, 0.010, 0.005, 0.002]));
     });
@@ -219,6 +220,16 @@ export class WatercolorAnimation extends CanvasAnimation {
       gl.uniform1fv(loc, new Float32Array([.4, .5, .6, .7, .8, .9]));
     });
 
+    this.imgRenderPass.addUniform("u_time",
+      (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+        const elapsed = (performance.now() - this.startTime) / 1000.0;
+        gl.uniform1f(loc, elapsed);
+      });
+
+    this.imgRenderPass.addUniform("u_dropCenter",
+      (gl: WebGLRenderingContext, loc: WebGLUniformLocation) => {
+        gl.uniform2f(loc, this.dropCenter[0], this.dropCenter[1]);
+      });
 
     this.imgRenderPass.setup();
   }
@@ -234,6 +245,55 @@ export class WatercolorAnimation extends CanvasAnimation {
     this.gui.reset();
   }
 
+  private paintSoft(xNorm: number, yNorm: number, radius: number, alpha: number): void {
+  if (!this.maskCtx) return;
+
+  const w = this.maskCanvas.width;
+  const h = this.maskCanvas.height;
+
+  const x = xNorm * w;
+  const y = yNorm * h;
+  const r = radius * Math.max(w, h);
+
+  const grad = this.maskCtx.createRadialGradient(x, y, 0, x, y, r);
+
+  grad.addColorStop(0,   `rgba(255,255,255,${alpha})`);
+  grad.addColorStop(0.5, `rgba(255,255,255,${alpha * 0.6})`);
+  grad.addColorStop(1.0, `rgba(255,255,255,0)`);
+
+  this.maskCtx.fillStyle = grad;
+  this.maskCtx.beginPath();
+  this.maskCtx.arc(x, y, r, 0, Math.PI * 2);
+  this.maskCtx.fill();
+}
+
+  private updateDrops(): void {
+  if (!this.maskCtx) return;
+
+  const now = performance.now();
+
+  for (let i = this.drops.length - 1; i >= 0; i--) {
+    const d = this.drops[i];
+    const t = (now - d.start) / 1000;
+
+    if (t > 2.0) {
+      this.drops.splice(i, 1);
+      continue;
+    }
+
+    const tNorm = Math.min(t / 1.5, 1.0);    
+    const eased = 1.0 - Math.exp(-3.0 * tNorm); 
+
+    const maxScale = 2;
+    const radius = this.brushRadius * (1.0 + eased * (maxScale - 1.0));
+
+    const alpha = 1.0 - t * 0.5;
+
+    this.paintSoft(d.x, d.y, radius, alpha);
+  }
+
+  this.maskDirty = true;
+}
 
   /** @internal
   * Draws a single frame
@@ -245,13 +305,7 @@ export class WatercolorAnimation extends CanvasAnimation {
     this.millis = curr;
     deltaT /= 1000;
 
-    // idk what this does and was giving error so i took it out
-    // if (this.ctx2) {
-    //   this.ctx2.clearRect(0, 0, this.ctx2.canvas.width, this.ctx2.canvas.height);
-    //   if (this.scene.meshes.length > 0) {
-    //     this.ctx2.fillText(this.getGUI().getModeString(), 50, 710);
-    //   }
-    // }
+    this.updateDrops();
 
     // Drawing
     const gl: WebGLRenderingContext = this.ctx;
@@ -292,8 +346,6 @@ export class WatercolorAnimation extends CanvasAnimation {
   }
 }
 
-// idt this is being used anywhere
-// this was being called in index.js in dist/watercolor but i changed it so im just gonna comment this out
 export function initializeCanvas(): void {
   const canvas = document.getElementById("glCanvas") as HTMLCanvasElement;
   /* Start drawing */
